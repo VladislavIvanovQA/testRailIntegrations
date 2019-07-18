@@ -22,7 +22,7 @@ compile 'com.github.ivanovvlad9626:TestRail:0.2'
 ```
 
 ### Example Usage
-* Create file **testRail.properties** 
+* Create file **testRail.properties** in src/main/resources/
 ```properties
 nameProject = Name project. This text add descriptions in testRung
 hostTR = http://past-you-url
@@ -36,17 +36,38 @@ regress = true //If you need not close Milestone, if all test passed. false clos
 nameSection = Name Section in TestRail contains test cases.
 project = Name Project in TestRail.
 ```
-* Add listener 
+* Add listener in TestNG open Run/Debug Configuration, Templates -> TestNG -> Listeners -> press plus btn -> paste name class TestRailListener or use gradle
 ```
 ru.integrations.testRail.listeners.TestRailListener
 ```
+Example gradle
+```groovy
+test {
+    useTestNG() {
+        listeners << 'ru.integrations.testRail.listeners.TestRailListener'
+
+    }
+    testLogging {
+        showStandardStreams = true
+        events "PASSED", "FAILED", "SKIPPED"
+        exceptionFormat = "full"
+    }
+
+    test.outputs.upToDateWhen { false }
+}
+```
+
 * If you use Rest-Assured, then you can use the ListenerRestAssured listener. He will add to the request and response, in the result of the cases that did not pass. 
-```text
-ru.integrations.testRail.listeners.ListenerRestAssured
+```java
+RestAssured.filters(new ListenerRestAssured());
 ```
 * Field annotation in test method.
-```text
+```java
 @TestRail(CaseName="Case name in TestRail")
+@Test
+public void test(){
+    
+}
 ```
 
 ## License
