@@ -36,10 +36,10 @@ public class ITestRail{
         }
     }
 
-    public void createMilestones(String name, String description){
+    public void createMilestones(String name){
         Milestone m = new Milestone();
         m.setName(name);
-        m.setDescription(description);
+        m.setDescription("Test automation");
         MILESTONE = testRail.milestones().add(PROJECT.getId(), m).execute();
     }
 

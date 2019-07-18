@@ -16,6 +16,8 @@ public interface ProjectConfig extends Config {
 
     String passTR();
 
+    String testRun();
+
     String newMilestone();
 
     String openMilestone();
@@ -26,6 +28,6 @@ public interface ProjectConfig extends Config {
 
     String project();
 
-    @ConverterClass(ProjectConvertor.class)
+    @ConverterClass(ProjectConverter.class)
     Project[] projects();
 }

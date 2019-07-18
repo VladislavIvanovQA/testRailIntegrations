@@ -1,10 +1,13 @@
 plugins {
     id 'java'
     id 'maven-publish'
+    id 'signing'
+    id 'maven'
 }
 
-group 'ru.integrations'
-version '1.0'
+group = "com.github.ivanovvlad9626"
+archivesBaseName = "TestRail"
+version = "0.2"
 
 sourceCompatibility = 1.8
 
@@ -17,6 +20,7 @@ dependencies {
     compile('com.codepine.api:testrail-api-java-client:2.0.1')
     compile group: 'org.testng', name: 'testng', version: '6.14.3'
     compile group: 'org.aeonbits.owner', name: 'owner', version: '1.0.10'
+    compile group: 'io.rest-assured', name: 'rest-assured', version: '3.1.0'
 }
 
 publishToMavenLocal.dependsOn(build)
@@ -26,9 +30,63 @@ publishing {
         testRail(MavenPublication) {
             groupId "ru.integrations"
             artifactId 'testRail'
-            version '1.1'
+            version '0.2'
 
-            artifact file("build/libs/testRail-1.0.jar")
+            artifact file("build/libs/TestRail-0.2.jar")
+        }
+    }
+}
+
+signing {
+    sign configurations.archives
+}
+
+task javadocJar(type: Jar) {
+    classifier = 'javadoc'
+    from javadoc
+}
+task sourcesJar(type: Jar) {
+    classifier = 'sources'
+    from sourceSets.main.allSource
+}
+artifacts {
+    archives javadocJar, sourcesJar
+}
+
+uploadArchives {
+    repositories {
+        mavenDeployer {
+            beforeDeployment { MavenDeployment deployment -> signing.signPom(deployment) }
+            repository(url: "https://oss.sonatype.org/service/local/staging/deploy/maven2/") {
+                authentication(userName: ossrhUsername, password: ossrhPassword)
+            }
+            snapshotRepository(url: "https://oss.sonatype.org/content/repositories/snapshots/") {
+                authentication(userName: ossrhUsername, password: ossrhPassword)
+            }
+            pom.project {
+                name 'TestRail Integrations'
+                packaging 'jar'
+                description 'This library for integrations on Test Rail. With config file'
+                url 'https://github.com/ivanovvlad9626/testRailIntegrations'
+                scm {
+                    connection 'scm:git:git://github.com/ivanovvlad9626/testRailIntegrations.git'
+                    developerConnection 'scm:git:ssh://github.com/ivanovvlad9626/testRailIntegrations.git'
+                    url 'https://github.com/ivanovvlad9626/testRailIntegrations/tree/master'
+                }
+                licenses {
+                    license {
+                        name 'The Apache License, Version 2.0'
+                        url 'print://www.apache.org/licenses/LICENSE-2.0.txt'
+                    }
+                }
+                developers {
+                    developer {
+                        id 'ivanovvlad9626'
+                        name 'Ivanov Vlad'
+                        email 'ivanovvlad.261996@mail.ru'
+                    }
+                }
+            }
         }
     }
 }

@@ -1,20 +1,28 @@
-package ru.integrations.testRail;
+package ru.integrations.testRail.listeners;
 
 import org.aeonbits.owner.ConfigFactory;
 import org.testng.*;
+import ru.integrations.testRail.ITestRail;
+import ru.integrations.testRail.TestRail;
 import ru.integrations.testRail.config.Project;
 import ru.integrations.testRail.config.ProjectConfig;
 import ru.integrations.testRail.exceptions.NotFoundParam;
 import ru.integrations.testRail.exceptions.NotFoundProject;
 
 import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.List;
 
-public class Listener extends TestListenerAdapter implements IClassListener {
+import static ru.integrations.testRail.listeners.ListenerRestAssured.getRequestFil;
+import static ru.integrations.testRail.listeners.ListenerRestAssured.getResponseFil;
+
+public class TestRailListener extends TestListenerAdapter implements IClassListener {
     private ITestRail testRail;
     private int countErrors = 0;
     private ProjectConfig config = ConfigFactory.create(ProjectConfig.class);
     private String project;
     private Project[] projects;
+    private List<String> notTagged = new ArrayList<>();
 
     @Override
     public void onStart(ITestContext testContext) {
@@ -32,7 +40,10 @@ public class Listener extends TestListenerAdapter implements IClassListener {
                 throw new NotFoundParam("nameSection");
             }
             if (config.project() == null && config.projects().length == 0) {
-                throw new NotFoundParam("project или projects");
+                throw new NotFoundParam("project or projects");
+            }
+            if (config.openMilestone() == null && config.newMilestone() == null) {
+                throw new NotFoundParam("openMilestone or newMilestone");
             }
         } catch (NotFoundParam notFoundParam) {
             notFoundParam.printStackTrace();
@@ -69,22 +80,26 @@ public class Listener extends TestListenerAdapter implements IClassListener {
                 }
             }
             if (!find) {
-                throw new NotFoundProject("Проект " + project + " не найден! Проверте корректность названия проекта.");
+                throw new NotFoundProject("Project " + project + " not found! Please check correct ProjectName in TestRail or config");
             }
         } else {
             testRail = new ITestRail(project, config);
         }
         if (config.openMilestone() == null || config.openMilestone().equals("")) {
-            testRail.createMilestones(config.newMilestone(), "Test automation");
+            testRail.createMilestones(config.newMilestone());
         } else {
             testRail.searchMilestones(config.openMilestone());
         }
-        testRail.createTestRun("Auto-Test " + config.nameProject(), "Авто-тесты для " + config.nameProject());
+        if (config.testRun() == null) {
+            testRail.createTestRun("Auto-Test " + config.nameProject(), "Automation Test in " + config.nameProject());
+        } else {
+            testRail.searchTestRun(config.testRun());
+        }
     }
 
     @Override
     public void onFinish(ITestContext testContext) {
-        if (config.projects() == null){
+        if (config.projects() == null) {
             if (config.testRailIntegrations()) {
                 if (!(countErrors > 0)) {
                     testRail.closeRun();
@@ -93,6 +108,7 @@ public class Listener extends TestListenerAdapter implements IClassListener {
                     }
                 }
             }
+            printMethodNotAnnotations();
         }
     }
 
@@ -107,6 +123,7 @@ public class Listener extends TestListenerAdapter implements IClassListener {
                     }
                 }
             }
+            printMethodNotAnnotations();
         }
     }
 
@@ -114,12 +131,14 @@ public class Listener extends TestListenerAdapter implements IClassListener {
     public void onTestSuccess(ITestResult result) {
         try {
             Method testMethod = result.getTestClass().getRealClass().getMethod(result.getMethod().getMethodName());
-            if (testMethod.isAnnotationPresent(TestRailImpl.class)) {
-                TestRailImpl testData = testMethod.getAnnotation(TestRailImpl.class);
-                String COMMENT = "Тест прошел!";
+            if (testMethod.isAnnotationPresent(TestRail.class)) {
+                TestRail testData = testMethod.getAnnotation(TestRail.class);
+                String COMMENT = "Test passed!";
                 if (config.testRailIntegrations()) {
                     testRail.setCaseStatus(testData.CaseName(), 1, COMMENT);
                 }
+            } else {
+                notTagged.add(testMethod.getName());
             }
         } catch (NoSuchMethodException e) {
             e.printStackTrace();
@@ -130,19 +149,36 @@ public class Listener extends TestListenerAdapter implements IClassListener {
     public void onTestFailure(ITestResult result) {
         try {
             Method testMethod = result.getTestClass().getRealClass().getMethod(result.getMethod().getMethodName());
-            if (testMethod.isAnnotationPresent(TestRailImpl.class)) {
-                TestRailImpl testData = testMethod.getAnnotation(TestRailImpl.class);
+            if (testMethod.isAnnotationPresent(TestRail.class)) {
+                TestRail testData = testMethod.getAnnotation(TestRail.class);
                 String error = "";
                 error += result.getThrowable().getMessage();
+                error += "\n";
                 error += "=================REQUEST=================\n";
+                error += getRequestFil() + "\n";
+                error += "\n";
                 error += "=================RESPONSE=================\n";
+                error += getResponseFil() + "\n";
                 if (config.testRailIntegrations()) {
                     testRail.setCaseStatus(testData.CaseName(), 5, error);
                     countErrors++;
                 }
+            } else {
+                notTagged.add(testMethod.getName());
             }
         } catch (NoSuchMethodException e) {
             e.printStackTrace();
+        }
+    }
+
+    private void printMethodNotAnnotations() {
+        if (notTagged.size() > 0) {
+            StringBuilder string = new StringBuilder();
+            string.append("The name of the method that does not contain annotations.");
+            for (String method : notTagged) {
+                string.append(method);
+            }
+            System.out.println(string);
         }
     }
 }
