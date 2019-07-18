@@ -13,12 +13,12 @@ A Java client library [codepine](https://github.com/codepine/testrail-api-java-c
 <dependency>
   <groupId>com.github.ivanovvlad9626</groupId>
   <artifactId>TestRail</artifactId>
-  <version>${stable.version.shown.above}</version>
+  <version>LATEST</version>
 </dependency>
 ```
 ### Gradle Dependency
 ```groovy
-compile 'com.github.ivanovvlad9626:TestRail:0.2'
+compile 'com.github.ivanovvlad9626:TestRail:+'
 ```
 
 ### Example Usage
@@ -58,8 +58,26 @@ test {
 ```
 
 * If you use Rest-Assured, then you can use the ListenerRestAssured listener. He will add to the request and response, in the result of the cases that did not pass. 
+
+Add this code with method initialization RestAssured data. 
 ```java
-RestAssured.filters(new ListenerRestAssured());
+ public static RequestSpecification base() {
+        RequestSpecification builder = RestAssured.given();
+        builder.baseUri("test.test.com");
+        builder.basePath("/api");
+        builder.port(5010);
+        builder.filter(new ListenerRestAssured());
+        return builder;
+    }
+    
+    public void getProfile(){
+        RestAssured
+                .given()
+                .spec(base())
+                .get("/profile")
+                .then()
+                .statusCode(200);
+    }
 ```
 * Field annotation in test method.
 ```java
