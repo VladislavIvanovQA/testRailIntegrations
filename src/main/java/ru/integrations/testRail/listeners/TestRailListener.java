@@ -3,6 +3,7 @@ package ru.integrations.testRail.listeners;
 import org.aeonbits.owner.ConfigFactory;
 import org.testng.*;
 import ru.integrations.testRail.ITestRail;
+import ru.integrations.testRail.ITestRailPojo;
 import ru.integrations.testRail.TestRail;
 import ru.integrations.testRail.config.Project;
 import ru.integrations.testRail.config.ProjectConfig;
@@ -10,19 +11,20 @@ import ru.integrations.testRail.exceptions.NotFoundParam;
 import ru.integrations.testRail.exceptions.NotFoundProject;
 
 import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 import static ru.integrations.testRail.listeners.ListenerRestAssured.getRequestFil;
 import static ru.integrations.testRail.listeners.ListenerRestAssured.getResponseFil;
 
 public class TestRailListener extends TestListenerAdapter implements IClassListener {
-    private ITestRail testRail;
-    private int countErrors = 0;
+    private Map<String, ITestRailPojo> testRail = new HashMap<>();
     private ProjectConfig config = ConfigFactory.create(ProjectConfig.class);
     private String project;
     private Project[] projects;
     private List<String> notTagged = new ArrayList<>();
+    private List<String> caseNotFound = new ArrayList<>();
+    private Map<String, Boolean> projectList = new HashMap<>();
+    private String thisProjectName;
 
     @Override
     public void onStart(ITestContext testContext) {
@@ -52,6 +54,13 @@ public class TestRailListener extends TestListenerAdapter implements IClassListe
             project = config.project();
         } else {
             projects = config.projects();
+            List<String> tempProject = new ArrayList<>();
+            for (Project pr : projects) {
+                tempProject.add(pr.getProject());
+            }
+            tempProject.stream()
+                    .distinct()
+                    .forEach(pr -> projectList.put(pr, false));
         }
     }
 
@@ -59,7 +68,7 @@ public class TestRailListener extends TestListenerAdapter implements IClassListe
     public void onBeforeClass(ITestClass testClass) {
         if (config.testRailIntegrations()) {
             if (config.project() != null) {
-                if (testRail == null) {
+                if (testRail.size() == 0) {
                     lifeCycle(testClass);
                 }
             } else if (config.projects().length != 0) {
@@ -74,26 +83,44 @@ public class TestRailListener extends TestListenerAdapter implements IClassListe
             String name = testClass.getRealClass().getName();
             boolean find = false;
             for (Project project : projects) {
-                if (project.getTestClass().contains(name)) {
-                    testRail = new ITestRail(project.getProject(), config);
-                    find = true;
+                if (project.getTestClass().equalsIgnoreCase(name)) {
+                    String nameProject = project.getProject();
+                    thisProjectName = nameProject;
+                    if (!projectList.get(nameProject)) {
+                        ITestRailPojo pojo = new ITestRailPojo();
+                        pojo.setTestRail(new ITestRail(nameProject, config));
+                        testRail.put(nameProject, pojo);
+                        find = true;
+                        projectList.replace(nameProject, true);
+                        milestoneAndTestRun();
+                        break;
+                    } else {
+                        find = true;
+                    }
                 }
             }
             if (!find) {
-                throw new NotFoundProject("Project " + project + " not found! Please check correct ProjectName in TestRail or config");
+                throw new NotFoundProject("Project " + Arrays.toString(projects) + " not found! Please check correct ProjectName in TestRail or config");
             }
         } else {
-            testRail = new ITestRail(project, config);
+            ITestRailPojo pojo = new ITestRailPojo();
+            pojo.setTestRail(new ITestRail(project, config));
+            testRail.put(project, pojo);
+            thisProjectName = project;
+            milestoneAndTestRun();
         }
+    }
+
+    private void milestoneAndTestRun() {
         if (config.openMilestone() == null || config.openMilestone().equals("")) {
-            testRail.createMilestones(config.newMilestone());
+            testRail.get(thisProjectName).getTestRail().createMilestones(config.newMilestone());
         } else {
-            testRail.searchMilestones(config.openMilestone());
+            testRail.get(thisProjectName).getTestRail().searchMilestones(config.openMilestone());
         }
         if (config.testRun() == null) {
-            testRail.createTestRun("Auto-Test " + config.nameProject(), "Automation Test in " + config.nameProject());
+            testRail.get(thisProjectName).getTestRail().createTestRun("Auto-Test " + config.nameProject(), "Automation Test in " + config.nameProject());
         } else {
-            testRail.searchTestRun(config.testRun());
+            testRail.get(thisProjectName).getTestRail().searchTestRun(config.testRun());
         }
     }
 
@@ -101,29 +128,28 @@ public class TestRailListener extends TestListenerAdapter implements IClassListe
     public void onFinish(ITestContext testContext) {
         if (config.projects() == null) {
             if (config.testRailIntegrations()) {
-                if (!(countErrors > 0)) {
-                    testRail.closeRun();
+                if (!(testRail.get(thisProjectName).getCountError() > 0)) {
+                    testRail.get(thisProjectName).getTestRail().closeRun();
                     if (!config.regress()) {
-                        testRail.closeMilestone();
+                        testRail.get(thisProjectName).getTestRail().closeMilestone();
                     }
                 }
             }
-            printMethodNotAnnotations();
         }
+        printProblems();
     }
 
     @Override
     public void onAfterClass(ITestClass testClass) {
         if (config.projects() != null) {
             if (config.testRailIntegrations()) {
-                if (!(countErrors > 0)) {
-                    testRail.closeRun();
+                if (!(testRail.get(thisProjectName).getCountError() > 0)) {
+                    testRail.get(thisProjectName).getTestRail().closeRun();
                     if (!config.regress()) {
-                        testRail.closeMilestone();
+                        testRail.get(thisProjectName).getTestRail().closeMilestone();
                     }
                 }
             }
-            printMethodNotAnnotations();
         }
     }
 
@@ -135,7 +161,10 @@ public class TestRailListener extends TestListenerAdapter implements IClassListe
                 TestRail testData = testMethod.getAnnotation(TestRail.class);
                 String COMMENT = "Test passed!";
                 if (config.testRailIntegrations()) {
-                    testRail.setCaseStatus(testData.CaseName(), 1, COMMENT);
+                    boolean caseStatus = testRail.get(thisProjectName).getTestRail().setCaseStatus(testData.CaseName(), 1, COMMENT);
+                    if (!caseStatus) {
+                        caseNotFound.add(testData.CaseName());
+                    }
                 }
             } else {
                 notTagged.add(testMethod.getName());
@@ -160,8 +189,11 @@ public class TestRailListener extends TestListenerAdapter implements IClassListe
                 error += "=================RESPONSE=================\n";
                 error += getResponseFil() + "\n";
                 if (config.testRailIntegrations()) {
-                    testRail.setCaseStatus(testData.CaseName(), 5, error);
-                    countErrors++;
+                    boolean caseStatus = testRail.get(thisProjectName).getTestRail().setCaseStatus(testData.CaseName(), 5, error);
+                    if (!caseStatus) {
+                        caseNotFound.add(testData.CaseName());
+                    }
+                    testRail.get(thisProjectName).setCountError(testRail.get(thisProjectName).getCountError() + 1);
                 }
             } else {
                 notTagged.add(testMethod.getName());
@@ -171,14 +203,20 @@ public class TestRailListener extends TestListenerAdapter implements IClassListe
         }
     }
 
-    private void printMethodNotAnnotations() {
+    private void printProblems() {
+        StringBuilder message = new StringBuilder();
         if (notTagged.size() > 0) {
-            StringBuilder string = new StringBuilder();
-            string.append("The name of the method that does not contain annotations.");
+            message.append("The name of the method that does not contain annotations. \n");
             for (String method : notTagged) {
-                string.append(method);
+                message.append(method).append("\n");
             }
-            System.out.println(string);
         }
+        if (caseNotFound.size() > 0) {
+            message.append("This cases, not set status in TestRail, please check title case. \n");
+            for (String txt : caseNotFound) {
+                message.append(txt).append("\n");
+            }
+        }
+        System.err.println(message);
     }
 }

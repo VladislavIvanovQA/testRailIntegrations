@@ -7,7 +7,7 @@ plugins {
 
 group = "com.github.ivanovvlad9626"
 archivesBaseName = "TestRail"
-version = "0.2"
+version = "0.3"
 
 sourceCompatibility = 1.8
 
@@ -30,9 +30,9 @@ publishing {
         testRail(MavenPublication) {
             groupId "ru.integrations"
             artifactId 'testRail'
-            version '0.2'
+            version '0.3'
 
-            artifact file("build/libs/TestRail-0.2.jar")
+            artifact file("build/libs/TestRail-0.3.jar")
         }
     }
 }
