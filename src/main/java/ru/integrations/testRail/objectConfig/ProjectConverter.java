@@ -1,4 +1,4 @@
-package ru.integrations.testRail.config;
+package ru.integrations.testRail.objectConfig;
 
 import org.aeonbits.owner.Converter;
 
