@@ -23,6 +23,13 @@ compile 'com.github.ivanovvlad9626:TestRail:+'
 
 ### Example Usage
 * Create file **testRail.properties** in src/main/resources/
+##### WARNING!
+* Please don't use sections and projects!
+* Please don't use section and sections! Use one.
+* Please don't use project and projects! Use one.
+
+delete or comment not used property.
+
 ```properties
 nameProject = Name project. This text add descriptions in testRung
 hostTR = http://past-you-url
@@ -33,8 +40,10 @@ newMilestone = Name Milestone "Test integrations".
 openMilestone = If you have Milestone. Paste this name milestone.
 testRun = If you have TestRun. Paste this name TestRun.
 regress = true //If you need not close Milestone, if all test passed. false close Milestone if all test passed.
-nameSection = Name Section in TestRail contains test cases.
+section = Name Section in TestRail contains test cases.
+sections = TestClass:NameSection, TestClass1:NameSections1
 project = Name Project in TestRail.
+projects = TestClass:NameProject, TestClass1:NameProject1
 ```
 * Add listener in TestNG open Run/Debug Configuration, Templates -> TestNG -> Listeners -> press plus btn -> paste name class TestRailListener or use gradle
 ```
