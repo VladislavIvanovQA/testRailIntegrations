@@ -45,7 +45,7 @@ public class TestRailListener extends TestListenerAdapter implements IClassListe
                 throw new NotFoundParam("passTR");
             }
             if (config.section() == null && config.sections().length == 0) {
-                throw new NotFoundParam("nameSection or sections");
+                throw new NotFoundParam("section or sections");
             }
             if (config.project() == null && config.projects().length == 0) {
                 throw new NotFoundParam("project or projects");
