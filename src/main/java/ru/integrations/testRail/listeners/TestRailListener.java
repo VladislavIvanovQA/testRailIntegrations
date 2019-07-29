@@ -5,19 +5,17 @@ import org.testng.*;
 import ru.integrations.testRail.ITestRail;
 import ru.integrations.testRail.ITestRailPojo;
 import ru.integrations.testRail.TestRail;
-import ru.integrations.testRail.objectConfig.Project;
 import ru.integrations.testRail.config.ProjectConfig;
-import ru.integrations.testRail.objectConfig.Section;
 import ru.integrations.testRail.exceptions.NotFoundParam;
 import ru.integrations.testRail.exceptions.NotFoundProject;
 import ru.integrations.testRail.exceptions.NotFoundSection;
+import ru.integrations.testRail.objectConfig.Project;
+import ru.integrations.testRail.objectConfig.Section;
 
 import java.lang.reflect.Method;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import static ru.integrations.testRail.listeners.ListenerRestAssured.getRequestFil;
-import static ru.integrations.testRail.listeners.ListenerRestAssured.getResponseFil;
 
 public class TestRailListener extends TestListenerAdapter implements IClassListener {
     private Map<String, ITestRailPojo> testRail = new HashMap<>();
@@ -33,46 +31,47 @@ public class TestRailListener extends TestListenerAdapter implements IClassListe
 
     @Override
     public void onStart(ITestContext testContext) {
-
-        try {
-            if (config.hostTR() == null) {
-                throw new NotFoundParam("hostTR");
-            }
-            if (config.loginTR() == null) {
-                throw new NotFoundParam("loginTR");
-            }
-            if (config.passTR() == null) {
-                throw new NotFoundParam("passTR");
-            }
-            if (config.section() == null && config.sections().length == 0) {
-                throw new NotFoundParam("section or sections");
-            }
-            if (config.project() == null && config.projects().length == 0) {
-                throw new NotFoundParam("project or projects");
-            }
-            if (config.openMilestone() == null && config.newMilestone() == null) {
-                throw new NotFoundParam("openMilestone or newMilestone");
-            }
-        } catch (NotFoundParam notFoundParam) {
-            notFoundParam.printStackTrace();
-        }
-        if (config.project() != null) {
-            project = config.project();
-            if (config.sections().length != 0) {
-                for (int i = 0; i < testContext.getAllTestMethods().length; i++) {
-                    classList.add(testContext.getAllTestMethods()[i].getTestClass().getName());
+        if (config.testRailIntegrations()) {
+            try {
+                if (config.hostTR() == null) {
+                    throw new NotFoundParam("hostTR");
                 }
+                if (config.loginTR() == null) {
+                    throw new NotFoundParam("loginTR");
+                }
+                if (config.passTR() == null) {
+                    throw new NotFoundParam("passTR");
+                }
+                if (config.section() == null && config.sections().length == 0) {
+                    throw new NotFoundParam("section or sections");
+                }
+                if (config.project() == null && config.projects().length == 0) {
+                    throw new NotFoundParam("project or projects");
+                }
+                if (config.openMilestone() == null && config.newMilestone() == null) {
+                    throw new NotFoundParam("openMilestone or newMilestone");
+                }
+            } catch (NotFoundParam notFoundParam) {
+                notFoundParam.printStackTrace();
+            }
+            if (config.project() != null) {
+                project = config.project();
+                if (config.sections().length != 0) {
+                    for (int i = 0; i < testContext.getAllTestMethods().length; i++) {
+                        classList.add(testContext.getAllTestMethods()[i].getTestClass().getName());
+                    }
 
+                }
+            } else {
+                projects = config.projects();
+                List<String> tempProject = new ArrayList<>();
+                for (Project pr : projects) {
+                    tempProject.add(pr.getProject());
+                }
+                tempProject.stream()
+                        .distinct()
+                        .forEach(pr -> projectList.put(pr, false));
             }
-        } else {
-            projects = config.projects();
-            List<String> tempProject = new ArrayList<>();
-            for (Project pr : projects) {
-                tempProject.add(pr.getProject());
-            }
-            tempProject.stream()
-                    .distinct()
-                    .forEach(pr -> projectList.put(pr, false));
         }
     }
 
@@ -124,7 +123,7 @@ public class TestRailListener extends TestListenerAdapter implements IClassListe
                             .distinct()
                             .collect(Collectors.toList());
 
-                    if (sectionList.size() == 0){
+                    if (sectionList.size() == 0) {
                         StringBuilder message = new StringBuilder();
                         message.append("Please check correct name sections in TestRai \n");
                         message.append("Parameter of config: \n");
@@ -134,7 +133,7 @@ public class TestRailListener extends TestListenerAdapter implements IClassListe
                             }
                         }
                         message.append("\n Test class name: \n");
-                        if (classList.size() != 0){
+                        if (classList.size() != 0) {
                             for (String next : classList) {
                                 message.append(next).append("\n");
                             }
@@ -230,12 +229,6 @@ public class TestRailListener extends TestListenerAdapter implements IClassListe
                 TestRail testData = testMethod.getAnnotation(TestRail.class);
                 String error = "";
                 error += result.getThrowable().getMessage();
-                error += "\n";
-                error += "=================REQUEST=================\n";
-                error += getRequestFil() + "\n";
-                error += "\n";
-                error += "=================RESPONSE=================\n";
-                error += getResponseFil() + "\n";
                 if (config.testRailIntegrations()) {
                     boolean caseStatus = testRail.get(thisProjectName).getTestRail().setCaseStatus(testData.CaseName(),
                             5, error);
